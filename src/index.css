@@ -1,0 +1,115 @@
+@import url("https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+@plugin "daisyui";
+
+* {
+  font-family: Quicksand, sans-serif !important;
+}
+
+/* Transparent background for OBS Browser Source */
+html,
+body,
+#root {
+  background: transparent !important;
+  width: 100%;
+  height: 100%;
+}
+body {
+  margin: 0;
+}
+
+/* (video/canvas rules removed) */
+
+/* ==UserStyle==
+@name           localhost/ingame/
+@namespace      github.com/openstyles/stylus
+@version        1.0.0
+@description    Streamkit-like voice overlay styling
+@author         You
+==/UserStyle== */
+
+/* Tổng container: full width, căn giữa */
+ul[class^="Voice_voiceStates"] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 8px 0;
+  list-style: none;
+  box-sizing: border-box;
+}
+
+/* Ô voice (khung mỗi người) */
+li[class^="Voice_voiceState"] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 320px;
+  height: 180px;
+  border-radius: 12px;
+  background-color: #070b10;
+  border: 3px solid transparent;
+  box-sizing: border-box;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Khi người nói: chỉ có viền ngoài */
+li.wrapper_speaking {
+  background-color: #0f1f2e;
+  border-color: #43b581;
+  box-shadow: 0 0 25px rgba(67, 181, 129, 0.5);
+}
+
+/* Avatar tròn ở giữa */
+img[class^="Voice_avatar"] {
+  width: 120px !important;
+  height: 120px !important;
+  border-radius: 50%;
+  object-fit: cover;
+  /* Only animate brightness when speaking; keep size fixed at 100px */
+  transition: filter 0.2s ease;
+  filter: brightness(30%);
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Khi nói: avatar sáng hơn, nhưng KHÔNG có viền xanh */
+li.wrapper_speaking img[class^="Voice_avatar"] {
+  /* Brighten avatar when speaking; no scaling so size remains 100px */
+  filter: brightness(100%);
+}
+
+/* Ẩn bất kỳ viền mặc định nào khi có class avatarSpeaking */
+img[class*="avatarSpeaking"] {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Tên người dùng hiển thị dưới avatar */
+div[class^="Voice_user"] {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+span[class^="Voice_name"] {
+  color: #fff;
+  font-size: 16px !important;
+  font-weight: 500;
+  background: transparent !important;
+  text-align: center;
+  /* Show full name: allow wrapping, no ellipsis */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
