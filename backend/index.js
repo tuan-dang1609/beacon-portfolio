@@ -583,8 +583,21 @@ setInterval(() => {
   try {
     const keepaliveUrl = `https://miccheck-bot-backend.onrender.com/_keepalive`;
     console.log("keepalive: pinging", keepaliveUrl);
-    const client = keepaliveUrl.startsWith("https:") ? https : http;
-    const req = client.get(keepaliveUrl, (res) => {
+    let client = http;
+    let urlObj = null;
+    try {
+      urlObj = new URL(keepaliveUrl);
+      client = urlObj.protocol === "https:" ? https : http;
+      console.log("keepalive: using client", urlObj.protocol);
+    } catch (urlErr) {
+      console.warn(
+        "keepalive: malformed URL, falling back to http",
+        urlErr && urlErr.message ? urlErr.message : urlErr
+      );
+      // keep client as http and use keepaliveUrl string
+    }
+
+    const req = client.get(urlObj || keepaliveUrl, (res) => {
       console.log(`keepalive: received ${res.statusCode}`);
       // consume response to avoid memory leaks
       res.on("data", () => {});
