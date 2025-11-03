@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import https from "https";
 import { Server as SocketServer } from "socket.io";
 import { Client, GatewayIntentBits } from "discord.js";
 import dotenv from "dotenv";
@@ -580,20 +581,17 @@ server.listen(PORT, () => console.log("⚡ Server running on port", PORT));
 // Periodic self-ping to prevent some hosters or renderers from idle-shutting the process
 setInterval(() => {
   try {
-    console.log(
-      "keepalive: pinging https://miccheck-bot-backend.onrender.com/_keepalive"
-    );
-    const req = http.get(
-      `https://miccheck-bot-backend.onrender.com/_keepalive`,
-      (res) => {
-        console.log(`keepalive: received ${res.statusCode}`);
-        // consume response to avoid memory leaks
-        res.on("data", () => {});
-        res.on("end", () => {
-          console.log("keepalive: response end");
-        });
-      }
-    );
+    const keepaliveUrl = `https://miccheck-bot-backend.onrender.com/_keepalive`;
+    console.log("keepalive: pinging", keepaliveUrl);
+    const client = keepaliveUrl.startsWith("https:") ? https : http;
+    const req = client.get(keepaliveUrl, (res) => {
+      console.log(`keepalive: received ${res.statusCode}`);
+      // consume response to avoid memory leaks
+      res.on("data", () => {});
+      res.on("end", () => {
+        console.log("keepalive: response end");
+      });
+    });
     req.on("error", (err) => {
       console.warn(
         "keepalive: request error:",
