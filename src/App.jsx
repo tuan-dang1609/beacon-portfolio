@@ -5,7 +5,7 @@ import io from "socket.io-client";
 // contains code to start/stop or render local camera streams.
 
 // Socket client: prefer pure WebSocket for lower latency
-const socket = io("http://localhost:3001", {
+const socket = io("https://miccheck-bot-backend.onrender.com", {
   transports: ["websocket"],
   reconnectionAttempts: 10,
   timeout: 8000,
@@ -17,11 +17,7 @@ export default function VoiceOverlay() {
   const localUserIdRef = useRef("");
 
   // NOTE: local camera / device selection removed
-  const [isPublisher, setIsPublisher] = useState(false);
-  const [isHost, setIsHost] = useState(true);
-  const pcRef = useRef(null); // publisher PC
-  const hostPcsRef = useRef(new Map()); // socketId -> RTCPeerConnection (host side)
-  const [remoteStreams, setRemoteStreams] = useState({}); // userId -> MediaStream
+  // video/publishing removed — keep simple voice-only state
 
   useEffect(() => {
     const onMembers = (data) => {
@@ -60,120 +56,28 @@ export default function VoiceOverlay() {
     const onConnect = () => {
       console.log("socket connected", socket.id);
       socket.emit("requestSnapshot");
-      // Register role for WebRTC signaling
-      if (isHost) {
-        socket.emit("register-role", { role: "host" });
-      } else if (isPublisher) {
-        socket.emit("register-role", {
-          role: "publisher",
-          userId: localUserIdRef.current,
-        });
-      }
     };
     const onConnectError = (err) => console.error("socket connect_error:", err);
     const onDisconnect = (reason) =>
       console.warn("socket disconnected:", reason);
 
-    const onVideoState = ({ id, hasVideo }) => {
-      // videoState events are tracked but we do not auto-start/stop cameras here
-      console.log("received videoState:", { id, hasVideo });
-      setMembers((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, hasVideo } : m))
-      );
-    };
-
     socket.on("voiceMembers", onMembers);
     socket.on("speaking", onSpeaking);
-    socket.on("videoState", onVideoState);
     socket.on("connect", onConnect);
     socket.on("connect_error", onConnectError);
     socket.on("disconnect", onDisconnect);
-
-    // Host: receive offers and ICE from publishers, create answers
-    const onRtcOffer = async ({ fromSocketId, userId, sdp }) => {
-      if (!isHost) return;
-      try {
-        let pc = hostPcsRef.current.get(fromSocketId);
-        if (!pc) {
-          pc = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-          });
-          hostPcsRef.current.set(fromSocketId, pc);
-          pc.onicecandidate = (e) => {
-            if (e.candidate) {
-              socket.emit("webrtc-ice-candidate", {
-                toSocketId: fromSocketId,
-                candidate: e.candidate,
-                userId,
-              });
-            }
-          };
-          pc.ontrack = (e) => {
-            const stream = e.streams?.[0] || new MediaStream([e.track]);
-            setRemoteStreams((prev) => ({ ...prev, [userId]: stream }));
-          };
-        }
-        await pc.setRemoteDescription({ type: "offer", sdp });
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit("webrtc-answer", {
-          toSocketId: fromSocketId,
-          sdp: answer.sdp,
-          userId,
-        });
-      } catch (err) {
-        console.warn("Host failed to handle offer:", err);
-      }
-    };
-
-    const onRtcCandidate = async ({ candidate, userId, fromSocketId }) => {
-      try {
-        if (isHost) {
-          const pc = hostPcsRef.current.get(fromSocketId);
-          if (pc && candidate) await pc.addIceCandidate(candidate);
-        } else if (isPublisher) {
-          if (pcRef.current && candidate)
-            await pcRef.current.addIceCandidate(candidate);
-        }
-      } catch (err) {
-        console.warn("ICE candidate handling error:", err);
-      }
-    };
-
-    const onPublisherLeft = ({ socketId, userId }) => {
-      try {
-        if (isHost) {
-          const pc = hostPcsRef.current.get(socketId);
-          if (pc) {
-            pc.close();
-            hostPcsRef.current.delete(socketId);
-          }
-          setRemoteStreams((prev) => {
-            const copy = { ...prev };
-            delete copy[userId];
-            return copy;
-          });
-        }
-      } catch {}
-    };
-
-    socket.on("webrtc-offer", onRtcOffer);
-    socket.on("webrtc-ice-candidate", onRtcCandidate);
-    socket.on("publisher-left", onPublisherLeft);
+    // WebRTC publisher/host handlers removed from frontend — backend still
+    // retains signaling if needed, but the overlay no longer handles tracks.
 
     return () => {
       // In dev StrictMode, avoid disconnecting the shared socket; just remove listeners
       socket.off("voiceMembers", onMembers);
       socket.off("speaking", onSpeaking);
-      socket.off("videoState", onVideoState);
       socket.off("connect", onConnect);
       socket.off("connect_error", onConnectError);
       socket.off("disconnect", onDisconnect);
-      socket.off("webrtc-offer", onRtcOffer);
-      socket.off("webrtc-ice-candidate", onRtcCandidate);
-      socket.off("publisher-left", onPublisherLeft);
     };
-  }, [isHost, isPublisher]);
+  }, []);
 
   // removed local webcam/effects and publisher auto-start behavior
 

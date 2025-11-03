@@ -65,7 +65,12 @@ client.once("ready", async () => {
         name: "joinroom",
         description: "Ask the bot to join your voice channel",
       });
-      console.log(`Registered /joinroom for guild ${guild.id}`);
+      // Also register /leaveroom so users can explicitly make the bot leave
+      await guild.commands.create({
+        name: "leaveroom",
+        description: "Ask the bot to leave its current voice channel",
+      });
+      console.log(`Registered /joinroom and /leaveroom for guild ${guild.id}`);
     }
   } catch (err) {
     console.error("Failed to register slash commands:", err);
@@ -180,6 +185,36 @@ async function joinChannelIfNotIn(channel) {
     return connection;
   } catch (err) {
     console.error("Failed to join voice channel:", err);
+  }
+}
+
+// Helper: leave a voice channel if the bot is currently in it
+async function leaveChannelIfIn(channel) {
+  if (!channel) return;
+  try {
+    const me = channel.guild.members.me;
+    const currentChannel = me?.voice?.channel;
+    if (!currentChannel || currentChannel.id !== channel.id) {
+      console.log("Bot is not in the specified channel, nothing to leave");
+      return;
+    }
+    try {
+      const { getVoiceConnection } = await import("@discordjs/voice");
+      const conn = getVoiceConnection(channel.guild.id);
+      if (conn) {
+        conn.destroy();
+        console.log("Bot left voice channel:", channel.id);
+      } else {
+        console.log(
+          "No active voice connection found to destroy for guild",
+          channel.guild.id
+        );
+      }
+    } catch (e) {
+      console.warn("Error while attempting to leave voice channel:", e);
+    }
+  } catch (err) {
+    console.error("leaveChannelIfIn error:", err);
   }
 }
 
@@ -389,6 +424,15 @@ client.on("messageCreate", async (message) => {
     await joinChannelIfNotIn(channel);
     return message.reply("Joined voice channel!");
   }
+  if (message.content === "!leave") {
+    const channel =
+      message.member?.voice?.channel ||
+      message.guild?.members.me?.voice?.channel;
+    if (!channel)
+      return message.reply("Bot không có ở trong voice channel nào.");
+    await leaveChannelIfIn(channel);
+    return message.reply("Left voice channel.");
+  }
 });
 
 // Handle slash command /joinroom
@@ -452,6 +496,53 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
+    if (interaction.commandName === "leaveroom") {
+      const member = interaction.member;
+      // Try to determine the channel to leave: prefer the guild's current bot channel
+      const botChannel = interaction.guild?.members.me?.voice?.channel;
+      if (!botChannel) {
+        try {
+          await interaction.reply({
+            content: "Bot hiện không ở trong voice channel nào.",
+            ephemeral: true,
+          });
+        } catch (e) {}
+        return;
+      }
+
+      try {
+        await interaction.deferReply({ ephemeral: true });
+      } catch (err) {
+        console.warn("Failed to defer leaveroom reply:", err);
+      }
+
+      try {
+        await leaveChannelIfIn(botChannel);
+        try {
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({ content: "Left voice channel." });
+          } else {
+            await interaction.reply({ content: "Left voice channel." });
+          }
+        } catch (e) {}
+      } catch (err) {
+        console.error("Error leaving channel for /leaveroom:", err);
+        try {
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+              content: "Failed to leave voice channel.",
+            });
+          } else {
+            await interaction.reply({
+              content: "Failed to leave voice channel.",
+              ephemeral: true,
+            });
+          }
+        } catch (e) {}
+      }
+      return;
+    }
+
     // camera toggle slash commands removed; only /joinroom is handled above
   } catch (err) {
     console.error("interactionCreate handler error:", err);
@@ -490,7 +581,7 @@ server.listen(PORT, () => console.log("⚡ Server running on port", PORT));
 setInterval(() => {
   try {
     const req = http.get(
-      `https://miccheck-bot-backend.onrender.com:${PORT}/_keepalive`,
+      `https://miccheck-bot-backend.onrender.com/_keepalive`,
       (res) => {
         // consume response to avoid memory leaks
         res.on("data", () => {});
