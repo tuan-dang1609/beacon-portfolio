@@ -14,6 +14,8 @@ import {
 
 const app = express();
 const server = http.createServer(app);
+// Keep-alive endpoint for internal pings
+app.get("/_keepalive", (_req, res) => res.send("ok"));
 dotenv.config();
 
 // Print dependency report for @discordjs/voice to help debug missing native deps
@@ -133,7 +135,7 @@ async function joinChannelIfNotIn(channel) {
           const member = channel.guild.members.cache.get(userId);
           const username = member?.user?.username || userId;
           const displayName = member?.displayName || username;
-          console.log("receiver speaking start:", userId, displayName);
+
           io.emit("speaking", {
             id: userId,
             username,
@@ -146,7 +148,7 @@ async function joinChannelIfNotIn(channel) {
           const member = channel.guild.members.cache.get(userId);
           const username = member?.user?.username || userId;
           const displayName = member?.displayName || username;
-          console.log("receiver speaking end:", userId, displayName);
+
           io.emit("speaking", {
             id: userId,
             username,
@@ -481,6 +483,22 @@ client.on("raw", (packet) => {
     }
   } catch {}
 });
-server.listen(process.env.PORT || 3001, () =>
-  console.log("⚡ Server running on port", process.env.PORT || 3001)
-);
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => console.log("⚡ Server running on port", PORT));
+
+// Periodic self-ping to prevent some hosters or renderers from idle-shutting the process
+setInterval(() => {
+  try {
+    const req = http.get(
+      `https://miccheck-bot-backend.onrender.com:${PORT}/_keepalive`,
+      (res) => {
+        // consume response to avoid memory leaks
+        res.on("data", () => {});
+        res.on("end", () => {});
+      }
+    );
+    req.on("error", () => {});
+  } catch (e) {
+    // ignore
+  }
+}, 10 * 1000);
