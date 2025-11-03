@@ -580,16 +580,27 @@ server.listen(PORT, () => console.log("⚡ Server running on port", PORT));
 // Periodic self-ping to prevent some hosters or renderers from idle-shutting the process
 setInterval(() => {
   try {
+    console.log(
+      "keepalive: pinging https://miccheck-bot-backend.onrender.com/_keepalive"
+    );
     const req = http.get(
       `https://miccheck-bot-backend.onrender.com/_keepalive`,
       (res) => {
+        console.log(`keepalive: received ${res.statusCode}`);
         // consume response to avoid memory leaks
         res.on("data", () => {});
-        res.on("end", () => {});
+        res.on("end", () => {
+          console.log("keepalive: response end");
+        });
       }
     );
-    req.on("error", () => {});
+    req.on("error", (err) => {
+      console.warn(
+        "keepalive: request error:",
+        err && err.message ? err.message : err
+      );
+    });
   } catch (e) {
-    // ignore
+    console.warn("keepalive: unexpected error:", e);
   }
 }, 10 * 1000);
